@@ -1,0 +1,8 @@
+# Global code owners
+* @Algieba-dean
+
+# Architecture & Configuration
+/src/app/ @Algieba-dean
+/src/shared/ @Algieba-dean
+/docs/ @Algieba-dean
+/.github/ @Algieba-dean

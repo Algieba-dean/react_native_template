@@ -1,0 +1,14 @@
+appId: com.enterprise.reactnativetemplate
+---
+# Flow 01: Cold Start & Core UI Elements Verification
+- launchApp:
+    clearState: true
+
+# Verify Application Header
+- assertVisible: "Enterprise React Native Template"
+- assertVisible: "A production-ready repository baseline for React Native teams."
+
+# Verify Runtime Environment Card & Configuration Values
+- assertVisible: "Runtime Environment"
+- assertVisible: "Development"
+- assertVisible: "https://api-dev.example.com"

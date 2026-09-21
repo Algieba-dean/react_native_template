@@ -1,0 +1,24 @@
+pre-commit:
+  parallel: false
+  commands:
+    lint:
+      glob: "*.{js,jsx,ts,tsx}"
+      run: npm run lint
+    format:
+      glob: "*.{js,jsx,ts,tsx,json,md}"
+      run: npm run format:check
+    typecheck:
+      glob: "*.{ts,tsx}"
+      run: npm run typecheck
+    test:
+      run: npm test
+
+commit-msg:
+  commands:
+    commit-check:
+      run: |
+        head -n 1 {1} | grep -qE '^(feat|fix|docs|style|refactor|perf|test|build|ci|chore|revert)(\([a-zA-Z0-9_\-\./]+\))?: .+' || {
+          echo "ERROR: Invalid commit message format."
+          echo "Follow Conventional Commits, e.g.: feat(auth): add biometric login"
+          exit 1
+        }

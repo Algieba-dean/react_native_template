@@ -1,0 +1,19 @@
+appId: com.enterprise.reactnativetemplate
+---
+# Flow 02: Theme Mode Switching (Light / Dark / System)
+- launchApp
+
+# Verify Theme section presence
+- assertVisible: "Theme Mode"
+
+# Switch to Dark Theme
+- tapOn: "Dark"
+- assertVisible: "Dark"
+
+# Switch to Light Theme
+- tapOn: "Light"
+- assertVisible: "Light"
+
+# Switch to System Theme
+- tapOn: "System"
+- assertVisible: "System"

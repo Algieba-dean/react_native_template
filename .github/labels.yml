@@ -1,0 +1,79 @@
+- name: 'type: bug'
+  color: 'd73a4a'
+  description: "Something isn't working"
+
+- name: 'type: feature'
+  color: 'a2eeef'
+  description: 'New feature or enhancement'
+
+- name: 'type: docs'
+  color: '0075ca'
+  description: 'Improvements or additions to documentation'
+
+- name: 'type: refactor'
+  color: 'fbca04'
+  description: 'Code change that neither fixes a bug nor adds a feature'
+
+- name: 'type: security'
+  color: 'b60205'
+  description: 'Security vulnerabilities or security hardening'
+
+- name: 'type: chore'
+  color: 'fef2c0'
+  description: 'Maintenance and tooling updates'
+
+- name: 'layer: app'
+  color: '5319e7'
+  description: 'Changes to application shell and bootstrap'
+
+- name: 'layer: features'
+  color: '1d76db'
+  description: 'Changes to business feature modules'
+
+- name: 'layer: shared'
+  color: '0e8a16'
+  description: 'Changes to shared infrastructure or UI components'
+
+- name: 'area: theme'
+  color: 'e99695'
+  description: 'Design system and theme tokens'
+
+- name: 'area: i18n'
+  color: 'c5def5'
+  description: 'Localization and translations'
+
+- name: 'area: services'
+  color: 'bfdadc'
+  description: 'HTTP client, storage, or external services'
+
+- name: 'area: navigation'
+  color: 'd4c5f9'
+  description: 'React Navigation and route definitions'
+
+- name: 'area: tests'
+  color: 'c2e0c6'
+  description: 'Unit, integration, and component tests'
+
+- name: 'area: ci'
+  color: '5319e7'
+  description: 'Continuous Integration workflows'
+
+- name: 'area: docs'
+  color: 'bfd4f2'
+  description: 'Project documentation and guides'
+
+- name: 'area: dependencies'
+  color: '0366d6'
+  description: 'Dependency updates'
+
+- name: 'status: in-progress'
+  color: 'fbca04'
+  description: 'Work is currently ongoing'
+
+- name: 'status: stale'
+  color: 'ffffff'
+  description: 'Inactive issue or pull request'
+
+- name: 'status: pinned'
+  color: '333333'
+  description: 'Pinned important item'

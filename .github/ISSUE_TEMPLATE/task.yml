@@ -1,0 +1,32 @@
+name: 📋 Task / Maintenance
+description: Track a refactoring task, dependency upgrade, or maintenance chore
+labels: ['type: chore']
+body:
+  - type: textarea
+    id: summary
+    attributes:
+      label: Task Summary
+      description: Brief description of the task or maintenance to perform.
+      placeholder: Upgrade React Native dependencies to latest stable version
+    validations:
+      required: true
+
+  - type: textarea
+    id: checklist
+    attributes:
+      label: Task Checklist
+      description: Concrete list of actionable items.
+      value: |
+        - [ ] Step 1
+        - [ ] Step 2
+        - [ ] Verify test suite passes
+    validations:
+      required: true
+
+  - type: textarea
+    id: context
+    attributes:
+      label: Additional Notes
+      description: Any extra background or technical context.
+    validations:
+      required: false

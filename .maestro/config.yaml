@@ -1,0 +1,11 @@
+# Maestro Global Suite Configuration
+appId: com.enterprise.reactnativetemplate
+name: Enterprise React Native Template E2E Suite
+tags:
+  - e2e
+  - smoke
+  - regression
+
+env:
+  APP_ID: com.enterprise.reactnativetemplate
+  DEFAULT_TIMEOUT_MS: 15000

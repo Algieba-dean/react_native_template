@@ -1,0 +1,27 @@
+appId: com.enterprise.reactnativetemplate
+---
+# Flow 03: Language Switching & Localized Text Verification
+- launchApp
+
+# Verify Language section presence
+- assertVisible: "Language"
+
+# Switch to Simplified Chinese
+- tapOn: "简体中文"
+
+# Validate localized UI texts in Chinese
+- assertVisible: "企业级 React Native 模版"
+- assertVisible: "运行时环境配置"
+- assertVisible: "主题模式"
+- assertVisible: "界面语言"
+- assertVisible: "开发环境 (Development)"
+
+# Switch back to English
+- tapOn: "English"
+
+# Validate localized UI texts back in English
+- assertVisible: "Enterprise React Native Template"
+- assertVisible: "Runtime Environment"
+- assertVisible: "Theme Mode"
+- assertVisible: "Language"
+- assertVisible: "Development"

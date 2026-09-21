@@ -1,0 +1,48 @@
+# Rules for PR auto-labeling by file paths
+
+'layer: app':
+  - changed-files:
+      - any-glob-to-any-file: 'src/app/**'
+
+'layer: features':
+  - changed-files:
+      - any-glob-to-any-file: 'src/features/**'
+
+'layer: shared':
+  - changed-files:
+      - any-glob-to-any-file: 'src/shared/**'
+
+'area: theme':
+  - changed-files:
+      - any-glob-to-any-file: 'src/shared/theme/**'
+
+'area: i18n':
+  - changed-files:
+      - any-glob-to-any-file: 'src/shared/localization/**'
+
+'area: services':
+  - changed-files:
+      - any-glob-to-any-file: 'src/shared/services/**'
+
+'area: navigation':
+  - changed-files:
+      - any-glob-to-any-file: 'src/shared/navigation/**'
+
+'area: tests':
+  - changed-files:
+      - any-glob-to-any-file: 'src/__tests__/**'
+      - any-glob-to-any-file: '**/*.test.{ts,tsx}'
+
+'area: ci':
+  - changed-files:
+      - any-glob-to-any-file: '.github/**'
+
+'area: docs':
+  - changed-files:
+      - any-glob-to-any-file: 'docs/**'
+      - any-glob-to-any-file: '*.md'
+
+'area: dependencies':
+  - changed-files:
+      - any-glob-to-any-file: 'package.json'
+      - any-glob-to-any-file: 'package-lock.json'

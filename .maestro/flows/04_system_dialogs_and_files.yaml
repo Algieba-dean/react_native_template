@@ -1,0 +1,51 @@
+appId: com.enterprise.reactnativetemplate
+---
+# Flow 04: System Dialogs, OS Permissions & File Storage Simulation
+- launchApp:
+    clearState: true
+
+# -------------------------------------------------------------
+# 1. System Permission & Alert Dialog Handling
+# Maestro handles native OS permission prompts across iOS & Android
+# -------------------------------------------------------------
+
+# Handle notification or generic permission dialogs if they appear
+- runFlow:
+    when:
+      visible: "(?i).*Allow.*|.*OK.*|.*Confirm.*"
+    commands:
+      - tapOn:
+          text: "(?i).*Allow.*|.*OK.*|.*Confirm.*"
+          optional: true
+
+# Handle location/media permission dialogs (e.g. "While using the app" / "Only this time")
+- runFlow:
+    when:
+      visible: "(?i).*While using the app.*"
+    commands:
+      - tapOn:
+          text: "(?i).*While using the app.*"
+          optional: true
+
+# -------------------------------------------------------------
+# 2. Device Lifecycle & Background Simulation
+# -------------------------------------------------------------
+- pressKey: Home
+- launchApp
+
+# -------------------------------------------------------------
+# 3. File & Media Storage Simulation
+# Maestro allows seeding mock files or photos onto device storage
+# before interacting with native document / image pickers.
+# Example:
+# - addMedia:
+#     - "assets/sample_avatar.jpg"
+# -------------------------------------------------------------
+
+# -------------------------------------------------------------
+# 4. Post-Interaction UI Assertion
+# -------------------------------------------------------------
+- assertVisible: "Enterprise React Native Template"
+- assertVisible: "Runtime Environment"
+- assertVisible: "Theme Mode"
+- assertVisible: "Language"
