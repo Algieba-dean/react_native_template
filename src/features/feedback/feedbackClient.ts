@@ -89,8 +89,9 @@ export class FeedbackClient {
         submittedAt: submission.submittedAt,
       };
     } catch (err) {
-      // Enqueue to outbox for background retry
+      // Enqueue to outbox for background retry and clear draft to avoid duplicate edits
       await this.enqueueToOutbox(submission);
+      await this.clearDraft();
       return {
         id: `queued_${Date.now()}`,
         status: 'queued',
@@ -112,6 +113,53 @@ export class FeedbackClient {
 
   async clearOutbox(): Promise<void> {
     await this.storage.removeItem(OUTBOX_STORAGE_KEY);
+  }
+
+  /**
+   * Retries submission of queued outbox items when connectivity is restored.
+   */
+  async retryOutbox(): Promise<{ sent: number; remaining: number }> {
+    const outbox = await this.getOutbox();
+    if (outbox.length === 0) {
+      return { sent: 0, remaining: 0 };
+    }
+
+    const remaining: FeedbackSubmission[] = [];
+    let sent = 0;
+
+    for (const item of outbox) {
+      try {
+        if (this.config.mockSubmission || !this.config.endpointUrl) {
+          sent++;
+          continue;
+        }
+
+        const response = await fetch(this.config.endpointUrl, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            ...(this.config.authToken ? { Authorization: `Bearer ${this.config.authToken}` } : {}),
+          },
+          body: JSON.stringify(item),
+        });
+
+        if (!response.ok) {
+          remaining.push(item);
+        } else {
+          sent++;
+        }
+      } catch {
+        remaining.push(item);
+      }
+    }
+
+    if (remaining.length === 0) {
+      await this.clearOutbox();
+    } else {
+      await this.storage.setItem(OUTBOX_STORAGE_KEY, remaining);
+    }
+
+    return { sent, remaining: remaining.length };
   }
 }
 

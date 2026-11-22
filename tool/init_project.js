@@ -74,8 +74,7 @@ function prompt(question, defaultValue = '') {
   });
 }
 
-function parseArgs() {
-  const args = process.argv.slice(2);
+function parseArgs(args = process.argv.slice(2)) {
   const result = {};
 
   for (let i = 0; i < args.length; i++) {
@@ -108,17 +107,203 @@ function parseArgs() {
   return result;
 }
 
-function replaceInFile(filePath, replacements) {
-  const fullPath = path.join(rootDir, filePath);
+function sanitizeName(name) {
+  return (name || '').replace(/[^a-zA-Z0-9]/g, '');
+}
+
+function replaceInFile(baseDir, filePath, replacements) {
+  const fullPath = path.join(baseDir, filePath);
   if (!fs.existsSync(fullPath)) {
     return;
   }
 
   let content = fs.readFileSync(fullPath, 'utf8');
   for (const [from, to] of replacements) {
-    content = content.split(from).join(to);
+    if (from instanceof RegExp) {
+      content = content.replace(from, to);
+    } else {
+      content = content.split(from).join(to);
+    }
   }
   fs.writeFileSync(fullPath, content, 'utf8');
+}
+
+function configureProject(targetDir, { projectName, displayName, bundleId, resetGit = false }) {
+  const sanitizedName = sanitizeName(projectName) || 'EnterpriseReactNativeTemplate';
+
+  // 1. Update package.json
+  const packageJsonPath = path.join(targetDir, 'package.json');
+  if (fs.existsSync(packageJsonPath)) {
+    const packageJson = JSON.parse(fs.readFileSync(packageJsonPath, 'utf8'));
+    packageJson.name = projectName;
+    packageJson.description = `${displayName} - Built with Enterprise React Native Template`;
+    packageJson.version = '0.1.0';
+    fs.writeFileSync(packageJsonPath, JSON.stringify(packageJson, null, 2) + '\n', 'utf8');
+  }
+
+  // 2. Update app.json
+  const appJsonPath = path.join(targetDir, 'app.json');
+  if (fs.existsSync(appJsonPath)) {
+    const appJson = {
+      name: sanitizedName,
+      displayName: displayName,
+    };
+    fs.writeFileSync(appJsonPath, JSON.stringify(appJson, null, 2) + '\n', 'utf8');
+  }
+
+  // 3. Update Environment files
+  const envFiles = ['.env.development', '.env.staging', '.env.production', '.env.example'];
+  for (const envFile of envFiles) {
+    const envPath = path.join(targetDir, envFile);
+    if (fs.existsSync(envPath)) {
+      let content = fs.readFileSync(envPath, 'utf8');
+      content = content.replace(/APP_TITLE=.*/g, `APP_TITLE="${displayName}"`);
+      fs.writeFileSync(envPath, content, 'utf8');
+    }
+  }
+
+  // 4. Update Maestro Configuration & Flows
+  const maestroFiles = [
+    '.maestro/config.yaml',
+    '.maestro/flows/01_app_launch.yaml',
+    '.maestro/flows/02_theme_toggle.yaml',
+    '.maestro/flows/03_language_switch.yaml',
+    '.maestro/flows/04_system_dialogs_and_files.yaml',
+  ];
+  for (const maestroFile of maestroFiles) {
+    replaceInFile(targetDir, maestroFile, [
+      [/appId:\s*['"]?[a-zA-Z0-9_.]+['"]?/, `appId: "${bundleId}"`],
+      ['com.enterprise.reactnativetemplate', bundleId],
+    ]);
+  }
+
+  // 5. Update Android Project Configuration
+  const androidAppGradle = 'android/app/build.gradle';
+  replaceInFile(targetDir, androidAppGradle, [
+    [/namespace\s+['"][^'"]+['"]/, `namespace "${bundleId}"`],
+    [/applicationId\s+['"][^'"]+['"]/, `applicationId "${bundleId}"`],
+  ]);
+
+  const androidStrings = 'android/app/src/main/res/values/strings.xml';
+  replaceInFile(targetDir, androidStrings, [
+    [/<string name="app_name">[^<]+<\/string>/, `<string name="app_name">${displayName}</string>`],
+  ]);
+
+  const androidSettings = 'android/settings.gradle';
+  replaceInFile(targetDir, androidSettings, [
+    [/rootProject\.name\s*=\s*['"][^'"]+['"]/, `rootProject.name = '${sanitizedName}'`],
+  ]);
+
+  // Relocate Android Kotlin source files to match package name
+  const javaBaseDir = path.join(targetDir, 'android/app/src/main/java');
+  if (fs.existsSync(javaBaseDir)) {
+    // Find directory containing MainActivity.kt
+    const findKotlinDir = dir => {
+      const entries = fs.readdirSync(dir, { withFileTypes: true });
+      for (const entry of entries) {
+        const full = path.join(dir, entry.name);
+        if (entry.isDirectory()) {
+          const sub = findKotlinDir(full);
+          if (sub) {
+            return sub;
+          }
+        } else if (entry.name === 'MainActivity.kt') {
+          return dir;
+        }
+      }
+      return null;
+    };
+
+    const currentKotlinDir = findKotlinDir(javaBaseDir);
+    const newJavaDir = path.join(javaBaseDir, ...bundleId.split('.'));
+
+    if (currentKotlinDir && currentKotlinDir !== newJavaDir) {
+      fs.mkdirSync(newJavaDir, { recursive: true });
+      for (const file of fs.readdirSync(currentKotlinDir)) {
+        const srcFile = path.join(currentKotlinDir, file);
+        const dstFile = path.join(newJavaDir, file);
+        let content = fs.readFileSync(srcFile, 'utf8');
+        content = content.replace(/^package\s+.*$/m, `package ${bundleId}`);
+        content = content.replace(
+          /getMainComponentName\(\): String = "[^"]*"/g,
+          `getMainComponentName(): String = "${sanitizedName}"`,
+        );
+        fs.writeFileSync(dstFile, content, 'utf8');
+        fs.unlinkSync(srcFile);
+      }
+      // Clean up empty directories up to javaBaseDir
+      let cleanupDir = currentKotlinDir;
+      while (cleanupDir !== javaBaseDir && cleanupDir.startsWith(javaBaseDir)) {
+        try {
+          fs.rmdirSync(cleanupDir);
+          cleanupDir = path.dirname(cleanupDir);
+        } catch (e) {
+          break; // directory not empty
+        }
+      }
+    } else if (currentKotlinDir) {
+      // Package directory already matches; still update package name and component name
+      for (const file of fs.readdirSync(currentKotlinDir)) {
+        const srcFile = path.join(currentKotlinDir, file);
+        if (fs.statSync(srcFile).isFile()) {
+          let content = fs.readFileSync(srcFile, 'utf8');
+          content = content.replace(/^package\s+.*$/m, `package ${bundleId}`);
+          content = content.replace(
+            /getMainComponentName\(\): String = "[^"]*"/g,
+            `getMainComponentName(): String = "${sanitizedName}"`,
+          );
+          fs.writeFileSync(srcFile, content, 'utf8');
+        }
+      }
+    }
+  }
+
+  // 6. Update iOS Project Configuration
+  const pbxprojPath = 'ios/EnterpriseReactNativeTemplate.xcodeproj/project.pbxproj';
+  replaceInFile(targetDir, pbxprojPath, [
+    ['PRODUCT_BUNDLE_IDENTIFIER = "org.reactjs.native.example.$(PRODUCT_NAME:rfc1034identifier)";', `PRODUCT_BUNDLE_IDENTIFIER = "${bundleId}";`],
+    [/PRODUCT_BUNDLE_IDENTIFIER = [^;]+;/g, `PRODUCT_BUNDLE_IDENTIFIER = ${bundleId};`],
+  ]);
+
+  // CRITICAL: Update iOS AppDelegate moduleName to match sanitizedName registered by AppRegistry
+  const iosAppDelegatePath = 'ios/EnterpriseReactNativeTemplate/AppDelegate.mm';
+  if (fs.existsSync(path.join(targetDir, iosAppDelegatePath))) {
+    replaceInFile(targetDir, iosAppDelegatePath, [
+      [/self\.moduleName = @".*";/, `self.moduleName = @"${sanitizedName}";`],
+    ]);
+  }
+
+  const iosInfoPlistPath = 'ios/EnterpriseReactNativeTemplate/Info.plist';
+  if (fs.existsSync(path.join(targetDir, iosInfoPlistPath))) {
+    replaceInFile(targetDir, iosInfoPlistPath, [
+      ['<key>CFBundleDisplayName</key>\n\t<string>EnterpriseReactNativeTemplate</string>', `<key>CFBundleDisplayName</key>\n\t<string>${displayName}</string>`],
+    ]);
+  }
+
+  const iosStoryboardPath = 'ios/EnterpriseReactNativeTemplate/LaunchScreen.storyboard';
+  if (fs.existsSync(path.join(targetDir, iosStoryboardPath))) {
+    replaceInFile(targetDir, iosStoryboardPath, [
+      ['text="EnterpriseReactNativeTemplate"', `text="${displayName}"`],
+    ]);
+  }
+
+  const runIosScript = 'scripts/run_ios.sh';
+  replaceInFile(targetDir, runIosScript, [
+    [/BUNDLE_ID="[^"]*"/, `BUNDLE_ID="${bundleId}"`],
+  ]);
+
+  // 7. Git Reset (if requested)
+  if (resetGit) {
+    const gitDir = path.join(targetDir, '.git');
+    if (fs.existsSync(gitDir)) {
+      fs.rmSync(gitDir, { recursive: true, force: true });
+      try {
+        execSync('git init -b main', { cwd: targetDir, stdio: 'ignore' });
+      } catch (e) {
+        execSync('git init', { cwd: targetDir, stdio: 'ignore' });
+      }
+    }
+  }
 }
 
 async function main() {
@@ -172,131 +357,16 @@ async function main() {
   log(`  Bundle ID:    ${bundleId}`);
   log(`  Reset Git:    ${resetGit ? 'Yes' : 'No'}\n`);
 
-  // 1. Update package.json
-  const packageJsonPath = path.join(rootDir, 'package.json');
-  if (fs.existsSync(packageJsonPath)) {
-    const packageJson = JSON.parse(fs.readFileSync(packageJsonPath, 'utf8'));
-    packageJson.name = projectName;
-    packageJson.description = `${displayName} - Built with Enterprise React Native Template`;
-    packageJson.version = '0.1.0';
-    fs.writeFileSync(packageJsonPath, JSON.stringify(packageJson, null, 2) + '\n', 'utf8');
-    log('✓ Updated package.json', colors.green);
-  }
+  configureProject(rootDir, { projectName, displayName, bundleId, resetGit });
 
-  // 2. Update app.json
-  const appJsonPath = path.join(rootDir, 'app.json');
-  if (fs.existsSync(appJsonPath)) {
-    const sanitizedName = projectName.replace(/[^a-zA-Z0-9]/g, '');
-    const appJson = {
-      name: sanitizedName,
-      displayName: displayName,
-    };
-    fs.writeFileSync(appJsonPath, JSON.stringify(appJson, null, 2) + '\n', 'utf8');
-    log('✓ Updated app.json', colors.green);
-  }
-
-  // 3. Update Environment files
-  const envFiles = ['.env.development', '.env.staging', '.env.production', '.env.example'];
-  for (const envFile of envFiles) {
-    const envPath = path.join(rootDir, envFile);
-    if (fs.existsSync(envPath)) {
-      let content = fs.readFileSync(envPath, 'utf8');
-      content = content.replace(/APP_TITLE=.*/g, `APP_TITLE="${displayName}"`);
-      fs.writeFileSync(envPath, content, 'utf8');
-    }
-  }
+  log('✓ Updated package.json', colors.green);
+  log('✓ Updated app.json', colors.green);
   log('✓ Updated environment files (.env.*)', colors.green);
-
-  // 4. Update Maestro Configuration & Flows
-  const maestroFiles = [
-    '.maestro/config.yaml',
-    '.maestro/flows/01_app_launch.yaml',
-    '.maestro/flows/02_theme_toggle.yaml',
-    '.maestro/flows/03_language_switch.yaml',
-    '.maestro/flows/04_system_dialogs_and_files.yaml',
-  ];
-  for (const maestroFile of maestroFiles) {
-    replaceInFile(maestroFile, [['com.enterprise.reactnativetemplate', bundleId]]);
-  }
   log('✓ Updated Maestro E2E test suite configurations', colors.green);
-
-  // 5. Update Android Project Configuration
-  const sanitizedName = projectName.replace(/[^a-zA-Z0-9]/g, '');
-  const androidAppGradle = 'android/app/build.gradle';
-  replaceInFile(androidAppGradle, [
-    ['namespace "com.enterprisereactnativetemplate"', `namespace "${bundleId}"`],
-    ['applicationId "com.enterprisereactnativetemplate"', `applicationId "${bundleId}"`],
-  ]);
-
-  const androidStrings = 'android/app/src/main/res/values/strings.xml';
-  replaceInFile(androidStrings, [
-    ['<string name="app_name">EnterpriseReactNativeTemplate</string>', `<string name="app_name">${displayName}</string>`],
-  ]);
-
-  const androidSettings = 'android/settings.gradle';
-  replaceInFile(androidSettings, [
-    ["rootProject.name = 'EnterpriseReactNativeTemplate'", `rootProject.name = '${sanitizedName}'`],
-  ]);
-
-  // Relocate Android Kotlin source files to match package name
-  const oldJavaDir = path.join(rootDir, 'android/app/src/main/java/com/enterprisereactnativetemplate');
-  if (fs.existsSync(oldJavaDir)) {
-    const newJavaDir = path.join(rootDir, 'android/app/src/main/java', ...bundleId.split('.'));
-    if (oldJavaDir !== newJavaDir) {
-      fs.mkdirSync(newJavaDir, { recursive: true });
-      for (const file of fs.readdirSync(oldJavaDir)) {
-        const srcFile = path.join(oldJavaDir, file);
-        const dstFile = path.join(newJavaDir, file);
-        let content = fs.readFileSync(srcFile, 'utf8');
-        content = content.replace(/package com\.enterprisereactnativetemplate/g, `package ${bundleId}`);
-        content = content.replace(/getMainComponentName\(\): String = "[^"]*"/g, `getMainComponentName(): String = "${sanitizedName}"`);
-        fs.writeFileSync(dstFile, content, 'utf8');
-        fs.unlinkSync(srcFile);
-      }
-      // Clean up empty directories
-      try {
-        fs.rmdirSync(oldJavaDir);
-        fs.rmdirSync(path.join(rootDir, 'android/app/src/main/java/com'));
-      } catch (e) {
-        // Ignored if parent still has files
-      }
-    }
-  }
   log('✓ Updated Android native project (package, namespace, strings, settings)', colors.green);
-
-  // 6. Update iOS Project Configuration
-  const pbxprojPath = 'ios/EnterpriseReactNativeTemplate.xcodeproj/project.pbxproj';
-  replaceInFile(pbxprojPath, [
-    ['PRODUCT_BUNDLE_IDENTIFIER = "org.reactjs.native.example.$(PRODUCT_NAME:rfc1034identifier)";', `PRODUCT_BUNDLE_IDENTIFIER = "${bundleId}";`],
-    ['PRODUCT_BUNDLE_IDENTIFIER = com.enterprise.reactnativetemplate;', `PRODUCT_BUNDLE_IDENTIFIER = ${bundleId};`],
-  ]);
-
-  const iosInfoPlistPath = 'ios/EnterpriseReactNativeTemplate/Info.plist';
-  if (fs.existsSync(path.join(rootDir, iosInfoPlistPath))) {
-    replaceInFile(iosInfoPlistPath, [
-      ['<key>CFBundleDisplayName</key>\n\t<string>EnterpriseReactNativeTemplate</string>', `<key>CFBundleDisplayName</key>\n\t<string>${displayName}</string>`],
-    ]);
-  }
-
-  const runIosScript = 'scripts/run_ios.sh';
-  replaceInFile(runIosScript, [
-    ['BUNDLE_ID="com.enterprise.reactnativetemplate"', `BUNDLE_ID="${bundleId}"`],
-  ]);
-  log('✓ Updated iOS native project (bundle ID, display name, runner scripts)', colors.green);
-
-  // 7. Git Reset (if requested)
+  log('✓ Updated iOS native project (bundle ID, display name, moduleName, runner scripts)', colors.green);
   if (resetGit) {
-    const gitDir = path.join(rootDir, '.git');
-    if (fs.existsSync(gitDir)) {
-      fs.rmSync(gitDir, { recursive: true, force: true });
-      try {
-        execSync('git init -b main', { cwd: rootDir, stdio: 'ignore' });
-        log('✓ Reinitialized Git repository on branch main', colors.green);
-      } catch (e) {
-        execSync('git init', { cwd: rootDir, stdio: 'ignore' });
-        log('✓ Reinitialized Git repository', colors.green);
-      }
-    }
+    log('✓ Reinitialized Git repository', colors.green);
   }
 
   log('\n✨ Project initialization complete!', colors.bright + colors.green);
@@ -306,8 +376,17 @@ async function main() {
   log('  3. Run `make run-ios` or `make run-android` to launch on your device/simulator\n');
 }
 
-main().catch(err => {
-  log(`Error initializing project: ${err.message}`, colors.red);
-  process.exit(1);
-});
+module.exports = {
+  parseArgs,
+  sanitizeName,
+  replaceInFile,
+  configureProject,
+  main,
+};
 
+if (require.main === module) {
+  main().catch(err => {
+    log(`Error initializing project: ${err.message}`, colors.red);
+    process.exit(1);
+  });
+}

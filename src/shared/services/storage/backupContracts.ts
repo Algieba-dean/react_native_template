@@ -22,12 +22,19 @@ export interface BackupEnvelope<T = unknown> {
 /**
  * Computes CRC32 checksum as a deterministic hexadecimal string.
  * Used for verifying payload integrity without heavy native crypto dependencies.
+ * Encodes text as UTF-8 bytes to correctly support international characters.
  */
 export function computeCrc32(data: string): string {
   let crc = 0 ^ -1;
-  for (let i = 0; i < data.length; i++) {
-    const byte = data.charCodeAt(i);
-    crc = (crc >>> 8) ^ CRC32_TABLE[(crc ^ byte) & 0xff];
+  const bytes =
+    typeof TextEncoder !== 'undefined'
+      ? new TextEncoder().encode(data)
+      : typeof Buffer !== 'undefined'
+        ? Buffer.from(data, 'utf-8')
+        : [];
+
+  for (let i = 0; i < bytes.length; i++) {
+    crc = (crc >>> 8) ^ CRC32_TABLE[(crc ^ bytes[i]) & 0xff];
   }
   const result = (crc ^ -1) >>> 0;
   return `crc32_${result.toString(16).padStart(8, '0')}`;

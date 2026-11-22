@@ -77,4 +77,23 @@ describe('HomeScreen Integration', () => {
       expect(getByText('Development')).toBeTruthy();
     });
   });
+
+  it('renders feedback card and opens feedback modal when requested', async () => {
+    const { getByTestId, getByText, getAllByText } = render(
+      <AppProviders>
+        <HomeScreen />
+      </AppProviders>,
+    );
+
+    expect(getByTestId('feedback-card')).toBeTruthy();
+    const openBtn = getByTestId('feedback-open-btn');
+    expect(openBtn).toBeTruthy();
+
+    fireEvent.press(openBtn);
+
+    await waitFor(() => {
+      expect(getAllByText('Send Feedback').length).toBeGreaterThan(1);
+      expect(getByText('Bug Report')).toBeTruthy();
+    });
+  });
 });

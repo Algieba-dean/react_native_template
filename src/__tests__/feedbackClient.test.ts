@@ -100,6 +100,19 @@ describe('FeedbackClient', () => {
     const outbox = await networkClient.getOutbox();
     expect(outbox).toHaveLength(1);
     expect(outbox[0].title).toBe('Offline test');
+    // Draft must also be cleared so user is not stuck with unsaved draft state
+    expect(await networkClient.loadDraft()).toBeNull();
+
+    // Now test retryOutbox when network is restored
+    global.fetch = jest.fn().mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({ id: 'fb_recovered', receiptNumber: 'FB-RECOVERED' }),
+    });
+
+    const retryResult = await networkClient.retryOutbox();
+    expect(retryResult.sent).toBe(1);
+    expect(retryResult.remaining).toBe(0);
+    expect(await networkClient.getOutbox()).toHaveLength(0);
 
     global.fetch = originalFetch;
   });

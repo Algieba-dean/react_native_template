@@ -6,6 +6,7 @@ import { ScreenContainer, AppText, Divider } from '@shared/components';
 import { EnvironmentCard } from './components/EnvironmentCard';
 import { ThemeToggleCard } from './components/ThemeToggleCard';
 import { LanguageSelectorCard } from './components/LanguageSelectorCard';
+import { FeedbackCard } from './components/FeedbackCard';
 
 export const HomeScreen: React.FC = () => {
   const { t } = useLocalization();
@@ -28,6 +29,7 @@ export const HomeScreen: React.FC = () => {
         <EnvironmentCard />
         <ThemeToggleCard />
         <LanguageSelectorCard />
+        <FeedbackCard />
       </View>
     </ScreenContainer>
   );

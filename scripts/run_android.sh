@@ -8,6 +8,18 @@ cd "$PROJECT_DIR"
 export ANDROID_HOME="${ANDROID_HOME:-$HOME/Library/Android/sdk}"
 export PATH="$ANDROID_HOME/platform-tools:$ANDROID_HOME/emulator:$ANDROID_HOME/cmdline-tools/latest/bin:$PATH"
 
+# Auto-detect JAVA_HOME if not already provided (e.g. macOS Android Studio bundled JBR)
+if [ -z "$JAVA_HOME" ]; then
+  if [ -d "/Applications/Android Studio.app/Contents/jbr/Contents/Home" ]; then
+    export JAVA_HOME="/Applications/Android Studio.app/Contents/jbr/Contents/Home"
+  elif [ -x "/usr/libexec/java_home" ]; then
+    export JAVA_HOME="$(/usr/libexec/java_home 2>/dev/null || true)"
+  fi
+fi
+if [ -n "$JAVA_HOME" ]; then
+  export PATH="$JAVA_HOME/bin:$PATH"
+fi
+
 if ! command -v adb >/dev/null 2>&1; then
   echo "❌ Error: adb not found. Please verify Android SDK is installed at $ANDROID_HOME."
   exit 1

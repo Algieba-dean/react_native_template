@@ -97,9 +97,16 @@ export class SafePersistenceStore<T> {
 
   /**
    * Updates state and persists to storage.
+   * Guaranteed to reject if store is not ready (preventing clobbering before read).
    * If writing fails, onWriteError is triggered and the previous state is preserved.
    */
   async setData(newData: T): Promise<boolean> {
+    if (this.status !== 'ready') {
+      throw new Error(
+        `Cannot persist data when store status is '${this.status}'. Must successfully initialize() before writes.`,
+      );
+    }
+
     if (this.validate && !this.validate(newData)) {
       throw new Error('Attempted to persist invalid data failing validation');
     }
@@ -125,6 +132,12 @@ export class SafePersistenceStore<T> {
    * Prepares a candidate state for atomic staging (e.g., during backup restore).
    */
   stageCandidate(candidate: T): void {
+    if (this.status !== 'ready') {
+      throw new Error(
+        `Cannot stage candidate when store status is '${this.status}'. Must successfully initialize() before staging.`,
+      );
+    }
+
     if (this.validate && !this.validate(candidate)) {
       throw new Error('Candidate failed validation before staging');
     }

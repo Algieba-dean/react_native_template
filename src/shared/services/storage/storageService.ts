@@ -74,6 +74,7 @@ export class AsyncStorageAdapter implements IStorageService {
   }
 
   async getItem<T>(key: string): Promise<T | null> {
+    await this.pendingWrites;
     const raw = await this.backend.getItem(key);
     if (raw === null || raw === undefined) {
       return null;
@@ -111,6 +112,7 @@ export class AsyncStorageAdapter implements IStorageService {
   }
 
   async getAllKeys(): Promise<string[]> {
+    await this.pendingWrites;
     if (this.backend.getAllKeys) {
       const keys = await this.backend.getAllKeys();
       return Array.from(keys);

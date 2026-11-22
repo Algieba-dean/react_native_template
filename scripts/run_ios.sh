@@ -26,7 +26,7 @@ fi
 # Locate built app bundle
 APP_PATH="$PROJECT_DIR/ios/build/Build/Products/Debug-iphonesimulator/EnterpriseReactNativeTemplate.app"
 
-if [ ! -d "$APP_PATH" ]; then
+if [ ! -d "$APP_PATH" ] || [ "$1" = "--rebuild" ] || [ "$REBUILD" = "1" ] || [ "$FORCE_REBUILD" = "1" ]; then
   FIRST_DEV=$(echo "$BOOTED_DEVICES" | head -n 1)
   echo "🔨 Building for iOS simulator with xcodebuild..."
   xcodebuild -workspace ios/EnterpriseReactNativeTemplate.xcworkspace \

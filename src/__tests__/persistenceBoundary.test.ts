@@ -118,6 +118,38 @@ describe('SafePersistenceStore', () => {
     expect(onWriteError).toHaveBeenCalledTimes(1);
     expect(store.getData()).toEqual(defaultState);
   });
+
+  it('enforces read-before-interactive: rejects setData and stageCandidate when uninitialized or in error state', async () => {
+    const store = new SafePersistenceStore<AppState>({
+      storageKey: 'app_state',
+      storageService: storage,
+      defaultData: defaultState,
+    });
+
+    // Uninitialized (status 'idle')
+    expect(store.getStatus()).toBe('idle');
+    await expect(store.setData({ theme: 'dark', items: ['blocked'] })).rejects.toThrow(
+      /Cannot persist data when store status is 'idle'/,
+    );
+    expect(() => store.stageCandidate({ theme: 'dark', items: ['blocked'] })).toThrow(
+      /Cannot stage candidate when store status is 'idle'/,
+    );
+
+    // Failing initialization (status 'error')
+    const faultyStorage = new InMemoryStorageAdapter();
+    jest.spyOn(faultyStorage, 'getItem').mockRejectedValueOnce(new Error('Corrupt disk'));
+    const errorStore = new SafePersistenceStore<AppState>({
+      storageKey: 'app_state',
+      storageService: faultyStorage,
+      defaultData: defaultState,
+    });
+    await errorStore.initialize();
+    expect(errorStore.getStatus()).toBe('error');
+
+    await expect(errorStore.setData({ theme: 'dark', items: ['clobber'] })).rejects.toThrow(
+      /Cannot persist data when store status is 'error'/,
+    );
+  });
 });
 
 describe('BackupContracts', () => {
@@ -129,6 +161,17 @@ describe('BackupContracts', () => {
     expect(hash1).toBe(hash2);
     expect(hash1).not.toBe(hash3);
     expect(hash1).toMatch(/^crc32_[0-9a-f]{8}$/);
+  });
+
+  it('correctly distinguishes non-ASCII and Unicode characters in CRC32', () => {
+    const ascii = computeCrc32('A');
+    const unicodeAccent = computeCrc32('Ł');
+    const cjk = computeCrc32('人形记');
+
+    expect(ascii).not.toBe(unicodeAccent);
+    expect(ascii).toBe('crc32_d3d99e8b');
+    expect(unicodeAccent).toBe('crc32_6deb8242');
+    expect(cjk).toMatch(/^crc32_[0-9a-f]{8}$/);
   });
 
   it('creates and validates a signed BackupEnvelope', () => {

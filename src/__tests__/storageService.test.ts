@@ -83,6 +83,45 @@ describe('StorageService & Adapters', () => {
     await persistent.flushPersistence();
   });
 
+  it('AsyncStorageAdapter ensures read-your-writes ordering by awaiting pendingWrites in getItem', async () => {
+    let internalStore = '';
+    let writeStarted = false;
+    let resolveWrite: (() => void) | null = null;
+
+    const slowBackend: IStorageBackend = {
+      getItem: jest.fn(async () => internalStore),
+      setItem: jest.fn(async (_k: string, v: string) => {
+        writeStarted = true;
+        await new Promise<void>(res => {
+          resolveWrite = res;
+        });
+        internalStore = v;
+      }),
+      removeItem: jest.fn(),
+      clear: jest.fn(),
+    };
+
+    const persistent = new AsyncStorageAdapter(slowBackend);
+
+    // Trigger setItem without awaiting
+    const setPromise = persistent.setItem('token', 'abc');
+
+    // Wait until backend.setItem has been called
+    while (!writeStarted) {
+      await new Promise(r => setTimeout(r, 5));
+    }
+
+    // Immediately trigger getItem: it should await pendingWrites instead of reading empty internalStore
+    const getPromise = persistent.getItem<string>('token');
+
+    // Release the write
+    resolveWrite!();
+    await setPromise;
+
+    const readVal = await getPromise;
+    expect(readVal).toBe('abc');
+  });
+
   it('createStorageService creates correct adapter based on options', () => {
     const memory = createStorageService();
     expect(memory.isPersistent).toBe(false);
