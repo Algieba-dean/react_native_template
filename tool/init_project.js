@@ -220,7 +220,71 @@ async function main() {
   }
   log('✓ Updated Maestro E2E test suite configurations', colors.green);
 
-  // 5. Git Reset (if requested)
+  // 5. Update Android Project Configuration
+  const sanitizedName = projectName.replace(/[^a-zA-Z0-9]/g, '');
+  const androidAppGradle = 'android/app/build.gradle';
+  replaceInFile(androidAppGradle, [
+    ['namespace "com.enterprisereactnativetemplate"', `namespace "${bundleId}"`],
+    ['applicationId "com.enterprisereactnativetemplate"', `applicationId "${bundleId}"`],
+  ]);
+
+  const androidStrings = 'android/app/src/main/res/values/strings.xml';
+  replaceInFile(androidStrings, [
+    ['<string name="app_name">EnterpriseReactNativeTemplate</string>', `<string name="app_name">${displayName}</string>`],
+  ]);
+
+  const androidSettings = 'android/settings.gradle';
+  replaceInFile(androidSettings, [
+    ["rootProject.name = 'EnterpriseReactNativeTemplate'", `rootProject.name = '${sanitizedName}'`],
+  ]);
+
+  // Relocate Android Kotlin source files to match package name
+  const oldJavaDir = path.join(rootDir, 'android/app/src/main/java/com/enterprisereactnativetemplate');
+  if (fs.existsSync(oldJavaDir)) {
+    const newJavaDir = path.join(rootDir, 'android/app/src/main/java', ...bundleId.split('.'));
+    if (oldJavaDir !== newJavaDir) {
+      fs.mkdirSync(newJavaDir, { recursive: true });
+      for (const file of fs.readdirSync(oldJavaDir)) {
+        const srcFile = path.join(oldJavaDir, file);
+        const dstFile = path.join(newJavaDir, file);
+        let content = fs.readFileSync(srcFile, 'utf8');
+        content = content.replace(/package com\.enterprisereactnativetemplate/g, `package ${bundleId}`);
+        content = content.replace(/getMainComponentName\(\): String = "[^"]*"/g, `getMainComponentName(): String = "${sanitizedName}"`);
+        fs.writeFileSync(dstFile, content, 'utf8');
+        fs.unlinkSync(srcFile);
+      }
+      // Clean up empty directories
+      try {
+        fs.rmdirSync(oldJavaDir);
+        fs.rmdirSync(path.join(rootDir, 'android/app/src/main/java/com'));
+      } catch (e) {
+        // Ignored if parent still has files
+      }
+    }
+  }
+  log('✓ Updated Android native project (package, namespace, strings, settings)', colors.green);
+
+  // 6. Update iOS Project Configuration
+  const pbxprojPath = 'ios/EnterpriseReactNativeTemplate.xcodeproj/project.pbxproj';
+  replaceInFile(pbxprojPath, [
+    ['PRODUCT_BUNDLE_IDENTIFIER = "org.reactjs.native.example.$(PRODUCT_NAME:rfc1034identifier)";', `PRODUCT_BUNDLE_IDENTIFIER = "${bundleId}";`],
+    ['PRODUCT_BUNDLE_IDENTIFIER = com.enterprise.reactnativetemplate;', `PRODUCT_BUNDLE_IDENTIFIER = ${bundleId};`],
+  ]);
+
+  const iosInfoPlistPath = 'ios/EnterpriseReactNativeTemplate/Info.plist';
+  if (fs.existsSync(path.join(rootDir, iosInfoPlistPath))) {
+    replaceInFile(iosInfoPlistPath, [
+      ['<key>CFBundleDisplayName</key>\n\t<string>EnterpriseReactNativeTemplate</string>', `<key>CFBundleDisplayName</key>\n\t<string>${displayName}</string>`],
+    ]);
+  }
+
+  const runIosScript = 'scripts/run_ios.sh';
+  replaceInFile(runIosScript, [
+    ['BUNDLE_ID="com.enterprise.reactnativetemplate"', `BUNDLE_ID="${bundleId}"`],
+  ]);
+  log('✓ Updated iOS native project (bundle ID, display name, runner scripts)', colors.green);
+
+  // 7. Git Reset (if requested)
   if (resetGit) {
     const gitDir = path.join(rootDir, '.git');
     if (fs.existsSync(gitDir)) {
