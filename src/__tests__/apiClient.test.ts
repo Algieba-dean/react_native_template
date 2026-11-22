@@ -34,6 +34,7 @@ jest.mock('axios', () => {
 
 import axios from 'axios';
 import { ApiClient } from '../shared/services/api/apiClient';
+import { structuredLogger } from '../shared/utils/structuredLogger';
 
 const mockedAxios = axios as jest.Mocked<typeof axios>;
 
@@ -42,8 +43,39 @@ describe('ApiClient', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
+    structuredLogger.clear();
     mockedAxios.create.mockReturnValue(mockAxiosInstance as any);
     client = new ApiClient('https://api.test.com', 5000);
+  });
+
+  it('never records request URLs, identifiers, tokens or response errors in diagnostic logs', async () => {
+    const requestHandler = mockAxiosInstance.interceptors.request.use.mock.calls[0][0];
+    const responseError = mockAxiosInstance.interceptors.response.use.mock.calls[0][1];
+    const request = { method: 'get', url: '/users/alice@example.com?token=secret123' };
+
+    expect(requestHandler(request)).toBe(request);
+
+    mockedAxios.isAxiosError.mockReturnValueOnce(true);
+    await expect(
+      responseError({
+        config: request,
+        code: 'ERR_NETWORK',
+        message: 'secret token leaked in message',
+        response: { status: 403, data: { message: 'forbidden secret' } },
+      }),
+    ).rejects.toMatchObject({ status: 403 });
+
+    const logs = JSON.stringify(structuredLogger.snapshot());
+    expect(logs).not.toMatch(/alice|secret|token/);
+    expect(structuredLogger.snapshot()).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ message: 'request', context: { method: 'GET' } }),
+        expect.objectContaining({
+          message: 'request_failed',
+          context: { code: 'ERR_NETWORK', status: 403 },
+        }),
+      ]),
+    );
   });
 
   it('should instantiate with default baseURL and interceptors', () => {

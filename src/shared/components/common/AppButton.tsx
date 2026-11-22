@@ -8,6 +8,7 @@ import {
   StyleSheet,
 } from 'react-native';
 import { useTheme } from '@app/providers/ThemeProvider';
+import { getButtonHitSlop } from '@shared/theme/accessibility';
 
 export interface AppButtonProps {
   title: string;
@@ -104,6 +105,7 @@ export const AppButton: React.FC<AppButtonProps> = ({
       onPress={onPress}
       disabled={disabled || loading}
       activeOpacity={0.7}
+      hitSlop={getButtonHitSlop(size)}
       accessibilityRole="button"
       accessibilityLabel={accessibilityLabel || title}
       accessibilityState={{ disabled: disabled || loading, busy: loading }}>

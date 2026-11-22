@@ -1,7 +1,7 @@
 import axios, { AxiosInstance, AxiosRequestConfig, AxiosResponse, AxiosError } from 'axios';
 import { defaultAppConfig } from '@app/appConfig';
 import { ApiResponse, ApiError, RequestConfig } from './types';
-import { logger } from '@shared/utils/logger';
+import { structuredLogger } from '@shared/utils/structuredLogger';
 
 export class ApiClient {
   private instance: AxiosInstance;
@@ -25,22 +25,27 @@ export class ApiClient {
   private setupInterceptors() {
     this.instance.interceptors.request.use(
       config => {
-        logger.debug(`[API Request] ${config.method?.toUpperCase()} ${config.url}`, config.params);
+        structuredLogger.debug('api.client', 'request', {
+          method: config.method?.toUpperCase() || 'UNKNOWN',
+        });
         return config;
       },
       error => {
-        logger.error('[API Request Error]', error);
+        structuredLogger.error('api.client', 'request_rejected');
         return Promise.reject(this.normalizeError(error));
       },
     );
 
     this.instance.interceptors.response.use(
       (response: AxiosResponse) => {
-        logger.debug(`[API Response] ${response.status} ${response.config.url}`);
+        structuredLogger.debug('api.client', 'response', { status: response.status });
         return response;
       },
       (error: AxiosError) => {
-        logger.error(`[API Error] ${error.config?.url}:`, error.message);
+        structuredLogger.error('api.client', 'request_failed', {
+          code: error.code || 'ERR_UNKNOWN',
+          status: error.response?.status || 0,
+        });
         return Promise.reject(this.normalizeError(error));
       },
     );

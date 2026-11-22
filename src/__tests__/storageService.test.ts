@@ -1,6 +1,12 @@
-import { storageService } from '../shared/services/storage/storageService';
+import {
+  storageService,
+  InMemoryStorageAdapter,
+  AsyncStorageAdapter,
+  createStorageService,
+  IStorageBackend,
+} from '../shared/services/storage/storageService';
 
-describe('StorageService', () => {
+describe('StorageService & Adapters', () => {
   beforeEach(async () => {
     await storageService.clear();
   });
@@ -36,5 +42,61 @@ describe('StorageService', () => {
     await storageService.clear();
     expect(await storageService.getItem('key1')).toBeNull();
     expect(await storageService.getItem('key2')).toBeNull();
+  });
+
+  it('identifies in-memory adapter as non-persistent', () => {
+    const memory = new InMemoryStorageAdapter();
+    expect(memory.isPersistent).toBe(false);
+  });
+
+  it('AsyncStorageAdapter correctly delegates to backing store and marks persistent', async () => {
+    const mockMap = new Map<string, string>();
+    const mockBackend: IStorageBackend = {
+      getItem: jest.fn(async (key: string) => mockMap.get(key) ?? null),
+      setItem: jest.fn(async (key: string, val: string) => {
+        mockMap.set(key, val);
+      }),
+      removeItem: jest.fn(async (key: string) => {
+        mockMap.delete(key);
+      }),
+      clear: jest.fn(async () => {
+        mockMap.clear();
+      }),
+      getAllKeys: jest.fn(async () => Array.from(mockMap.keys())),
+    };
+
+    const persistent = new AsyncStorageAdapter(mockBackend);
+    expect(persistent.isPersistent).toBe(true);
+
+    await persistent.setItem('pref_theme', 'dark');
+    expect(mockBackend.setItem).toHaveBeenCalledWith('pref_theme', JSON.stringify('dark'));
+
+    const val = await persistent.getItem<string>('pref_theme');
+    expect(val).toBe('dark');
+
+    const keys = await persistent.getAllKeys();
+    expect(keys).toContain('pref_theme');
+
+    await persistent.removeItem('pref_theme');
+    expect(await persistent.getItem('pref_theme')).toBeNull();
+
+    await persistent.flushPersistence();
+  });
+
+  it('createStorageService creates correct adapter based on options', () => {
+    const memory = createStorageService();
+    expect(memory.isPersistent).toBe(false);
+
+    const mockBackend: IStorageBackend = {
+      getItem: jest.fn(),
+      setItem: jest.fn(),
+      removeItem: jest.fn(),
+      clear: jest.fn(),
+    };
+    const persistent = createStorageService({
+      adapter: 'persistent',
+      backend: mockBackend,
+    });
+    expect(persistent.isPersistent).toBe(true);
   });
 });

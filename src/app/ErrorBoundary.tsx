@@ -2,6 +2,7 @@ import React, { Component, ErrorInfo, ReactNode } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { logger } from '../shared/utils/logger';
+import { structuredLogger } from '../shared/utils/structuredLogger';
 
 interface Props {
   children: ReactNode;
@@ -25,6 +26,7 @@ export class ErrorBoundary extends Component<Props, State> {
 
   public componentDidCatch(error: Error, errorInfo: ErrorInfo) {
     logger.error('Uncaught error in component tree:', { error, errorInfo });
+    structuredLogger.error('app.lifecycle', 'error_boundary', { status: 500 });
   }
 
   private resetError = () => {
@@ -47,7 +49,12 @@ export class ErrorBoundary extends Component<Props, State> {
                 {this.state.error.toString()}
               </Text>
             </View>
-            <TouchableOpacity style={styles.button} onPress={this.resetError} activeOpacity={0.8}>
+            <TouchableOpacity
+              style={styles.button}
+              onPress={this.resetError}
+              activeOpacity={0.8}
+              accessibilityRole="button"
+              accessibilityLabel="Try Again">
               <Text style={styles.buttonText}>Try Again</Text>
             </TouchableOpacity>
           </View>
