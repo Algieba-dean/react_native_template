@@ -11,3 +11,4 @@ export * from './shared/components';
 export * from './shared/navigation';
 export * from './shared/utils';
 export * from './features/home';
+export * from './features/feedback';
